@@ -1,17 +1,29 @@
 package main
 
 import (
-	"net/http"
+	"fakebook-api/controllers"
+	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
+	controllers.InitDatabase()
 	r := gin.Default()
+	config := cors.DefaultConfig()
+	config.AllowAllOrigins = true
+	config.AllowMethods = []string{"POST", "GET", "PUT", "DELETE"}
+	config.AllowHeaders = []string{"Origin", "Content-Type", "Authorization", "Accept", "User-Agent", "Cache-Control", "Pragma"}
+	config.ExposeHeaders = []string{"Content-Length"}
+	config.AllowCredentials = true
+	config.MaxAge = 12 * time.Hour
 
-	r.GET("/", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"data": "Hello World!"})
-	})
+	r.Use(cors.New(config))
+
+	r.GET("/books", controllers.FindBooks)
+	r.POST("/books", controllers.CreateBooks)
+	r.DELETE("/books/:id", controllers.DeleteBooks)
 
 	r.Run()
 }
