@@ -54,7 +54,6 @@ func InitDatabase() {
 			insertedBooks = insertedBooks + ", "
 		}
 	}
-	fmt.Print(insertedBooks)
 	insert, err := db.Query(insertedBooks + ";")
 	if err != nil {
 		panic(err.Error())
@@ -105,34 +104,68 @@ func CreateBooks(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
 	}
 
-	Counter++
+	cfg := mysql.Config{
+		User:                 "root",
+		Passwd:               "",
+		Net:                  "tcp",
+		Addr:                 "127.0.0.1:3306",
+		DBName:               "fakebook",
+		AllowNativePasswords: true,
+	}
 
-	book := models.Book{Id: Counter, Title: input.Title, Author: input.Author, Image: input.Image}
-	Library = append(Library, book)
+	db, err := sql.Open("mysql", cfg.FormatDSN())
+	if err != nil {
+		panic(err.Error())
+	}
 
-	c.JSON(http.StatusOK, gin.H{"data": book})
+	defer db.Close()
+
+	insert, err := db.Query("INSERT INTO books (title, author, image) VALUES (?, ?, ?);", input.Title, input.Author, input.Image)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	defer insert.Close()
+
+	c.JSON(http.StatusOK, gin.H{"data": input})
 }
 
 func FindBookById(c *gin.Context) {
-	bookFound := false
+	cfg := mysql.Config{
+		User:                 "root",
+		Passwd:               "",
+		Net:                  "tcp",
+		Addr:                 "127.0.0.1:3306",
+		DBName:               "fakebook",
+		AllowNativePasswords: true,
+	}
 
-	var bookFind models.Book
-	for _, book := range Library {
-		if c.Param("id") == strconv.Itoa(book.Id) {
-			bookFound = true
-			bookFind = book
+	db, err := sql.Open("mysql", cfg.FormatDSN())
+	if err != nil {
+		panic(err.Error())
+	}
+
+	book := &models.Book{}
+
+	defer db.Close()
+
+	id := c.Param("id")
+	results, err := db.Query("Select * FROM books WHERE id = ?", id)
+	if err != nil {
+		fmt.Println("Err", err.Error())
+	}
+
+	if results.Next() {
+		err = results.Scan(&book.Id, &book.Title, &book.Author, &book.Image)
+		if err != nil {
+			panic(err.Error())
 		}
+	} else {
+		panic(err.Error())
 	}
-
-	if !bookFound {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"data": bookFind})
+	c.JSON(http.StatusOK, gin.H{"data": book})
 }
 
 func UpdateBook(c *gin.Context) {
