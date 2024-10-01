@@ -22,7 +22,9 @@ func main() {
 	r.Use(cors.New(config))
 
 	r.GET("/books", controllers.FindBooks)
+	r.GET("/books/:id", controllers.FindBookById)
 	r.POST("/books", controllers.CreateBooks)
+	r.PUT("/books/:id", controllers.UpdateBook)
 	r.DELETE("/books/:id", controllers.DeleteBooks)
 
 	r.Run()
