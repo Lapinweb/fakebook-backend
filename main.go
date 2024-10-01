@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	controllers.InitDatabase()
+	//controllers.InitDatabase()
 	r := gin.Default()
 	config := cors.DefaultConfig()
 	config.AllowAllOrigins = true
