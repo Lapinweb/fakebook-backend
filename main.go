@@ -2,6 +2,9 @@ package main
 
 import (
 	"fakebook-api/controllers"
+	"fakebook-api/database"
+	"fakebook-api/models"
+	"net/http"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -9,8 +12,16 @@ import (
 )
 
 func main() {
+	db := database.ConnectDb()
+	db.AutoMigrate(&models.Book{})
+	//database.InitDatabase(db)
+
+	bookRepo := controllers.BookRepo{
+		Db: db,
+	}
+
 	//controllers.InitDatabase()
-	r := gin.Default()
+	r := setupRouter()
 	config := cors.DefaultConfig()
 	config.AllowAllOrigins = true
 	config.AllowMethods = []string{"POST", "GET", "PUT", "DELETE"}
@@ -21,11 +32,21 @@ func main() {
 
 	r.Use(cors.New(config))
 
-	r.GET("/books", controllers.FindBooks)
-	r.GET("/books/:id", controllers.FindBookById)
-	r.POST("/books", controllers.CreateBooks)
-	r.PUT("/books/:id", controllers.UpdateBook)
-	r.DELETE("/books/:id", controllers.DeleteBooks)
+	r.GET("/books", bookRepo.FindBooks)
+	r.GET("/books/:id", bookRepo.FindBookById)
+	r.POST("/books", bookRepo.CreateBook)
+	r.PUT("/books/:id", bookRepo.UpdateBook)
+	r.DELETE("/books/:id", bookRepo.DeleteBooks)
 
 	r.Run()
+}
+
+func setupRouter() *gin.Engine {
+	r := gin.Default()
+
+	r.GET("ping", func(c *gin.Context) {
+		c.JSON(http.StatusOK, "pong")
+	})
+
+	return r
 }

@@ -2,221 +2,75 @@ package controllers
 
 import (
 	"fakebook-api/models"
-	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-
-	"database/sql"
-
-	"github.com/go-sql-driver/mysql"
+	"gorm.io/gorm"
 )
 
-var Library []models.Book
-var Counter int
-
-func InitDatabase() {
-	cfg := mysql.Config{
-		User:                 "root",
-		Passwd:               "",
-		Net:                  "tcp",
-		Addr:                 "127.0.0.1:3306",
-		DBName:               "fakebook",
-		AllowNativePasswords: true,
-	}
-
-	db, err := sql.Open("mysql", cfg.FormatDSN())
-	if err != nil {
-		panic(err.Error())
-	}
-
-	defer db.Close()
-
-	/*imageUrl := []string{
-		"https://via.assets.so/img.jpg?w=400&h=650&tc=white&bg=pink",
-		"https://via.assets.so/img.jpg?w=220&h=250&tc=white&bg=pink",
-		"https://via.assets.so/img.jpg?w=100&h=100&tc=white&bg=pink",
-		"https://via.assets.so/img.jpg?w=300&h=250&tc=white&bg=pink",
-	}*/
-
-	insertedBooks := "INSERT INTO books (title, author, image) VALUES "
-	for i := 0; i < 10; i++ {
-		book := models.Book{
-			Title:  fmt.Sprintf("Book %v", i+1),
-			Author: fmt.Sprintf("Author %v", i+1),
-			Image:  "https://via.assets.so/img.jpg?w=250&h=150&tc=white&bg=pink",
-		}
-		//Library = append(Library, book)
-
-		insertedBooks = insertedBooks + fmt.Sprintf("('%v', '%v', '%v')", book.Title, book.Author, book.Image)
-		if i != 9 {
-			insertedBooks = insertedBooks + ", "
-		}
-	}
-	insert, err := db.Query(insertedBooks + ";")
-	if err != nil {
-		panic(err.Error())
-	}
-
-	defer insert.Close()
+type BookRepo struct {
+	Db *gorm.DB
 }
 
-func FindBooks(c *gin.Context) {
-	cfg := mysql.Config{
-		User:                 "root",
-		Passwd:               "",
-		Net:                  "tcp",
-		Addr:                 "127.0.0.1:3306",
-		DBName:               "fakebook",
-		AllowNativePasswords: true,
-	}
-
-	db, err := sql.Open("mysql", cfg.FormatDSN())
+func (repository *BookRepo) FindBooks(c *gin.Context) {
+	var bookModel models.Book
+	books, err := bookModel.GetBooks(repository.Db)
 	if err != nil {
-		panic(err.Error())
+		c.String(http.StatusInternalServerError, "Books not found!")
+		return
 	}
+	c.JSON(http.StatusOK, gin.H{"books": books})
+}
 
-	defer db.Close()
+func (repository *BookRepo) FindBookById(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
 
-	results, err := db.Query("SELECT * FROM books")
+	var book models.Book
+	err := book.GetBookById(repository.Db, uint(id))
 	if err != nil {
-		fmt.Println("Err", err.Error())
+		c.String(http.StatusInternalServerError, "Book not found!")
 		return
 	}
 
-	books := []models.Book{}
-	for results.Next() {
-		var book models.Book
-		err = results.Scan(&book.Id, &book.Title, &book.Author, &book.Image)
-		if err != nil {
-			panic(err.Error())
-		}
-
-		books = append(books, book)
-	}
-
-	c.JSON(http.StatusOK, gin.H{"data": books})
+	c.JSON(http.StatusOK, gin.H{"book": &book})
 }
 
-func CreateBooks(c *gin.Context) {
-	var input models.Book
-
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-	}
-
-	cfg := mysql.Config{
-		User:                 "root",
-		Passwd:               "",
-		Net:                  "tcp",
-		Addr:                 "127.0.0.1:3306",
-		DBName:               "fakebook",
-		AllowNativePasswords: true,
-	}
-
-	db, err := sql.Open("mysql", cfg.FormatDSN())
-	if err != nil {
-		panic(err.Error())
-	}
-
-	defer db.Close()
-
-	insert, err := db.Query("INSERT INTO books (title, author, image) VALUES (?, ?, ?);", input.Title, input.Author, input.Image)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	defer insert.Close()
-
-	c.JSON(http.StatusOK, gin.H{"data": input})
+type BookCreate struct {
+	Title  string `json:"title"`
+	Author string `json:"author_name"`
+	Image  string `json:"cover_i"`
 }
 
-func FindBookById(c *gin.Context) {
-	cfg := mysql.Config{
-		User:                 "root",
-		Passwd:               "",
-		Net:                  "tcp",
-		Addr:                 "127.0.0.1:3306",
-		DBName:               "fakebook",
-		AllowNativePasswords: true,
+func (repository *BookRepo) CreateBook(c *gin.Context) {
+	var bookInput BookCreate
+	if err := c.ShouldBindJSON(&bookInput); err != nil {
+		c.String(http.StatusInternalServerError, "Erreur récupération du JSON")
+		return
 	}
 
-	db, err := sql.Open("mysql", cfg.FormatDSN())
+	newBook := models.Book{
+		Title:  bookInput.Title,
+		Author: bookInput.Author,
+	}
+	err := newBook.UpdateOrCreateBook(repository.Db)
 	if err != nil {
-		panic(err.Error())
+		c.String(http.StatusInternalServerError, "Erreur création du livre")
+		return
 	}
 
-	book := &models.Book{}
-
-	defer db.Close()
-
-	id := c.Param("id")
-	results, err := db.Query("Select * FROM books WHERE id = ?", id)
-	if err != nil {
-		fmt.Println("Err", err.Error())
-	}
-
-	if results.Next() {
-		err = results.Scan(&book.Id, &book.Title, &book.Author, &book.Image)
-		if err != nil {
-			panic(err.Error())
-		}
-	} else {
-		panic(err.Error())
-	}
-	c.JSON(http.StatusOK, gin.H{"data": book})
+	c.JSON(http.StatusOK, gin.H{"book": newBook})
 }
 
-func UpdateBook(c *gin.Context) {
+func (repository *BookRepo) UpdateBook(c *gin.Context) {
 	var updatedBook models.Book
 
-	if err := c.ShouldBindJSON(&updatedBook); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	for index, book := range Library {
-		if c.Param("id") == strconv.Itoa(book.Id) {
-			if updatedBook.Title != "" {
-				Library[index].Title = updatedBook.Title
-			}
-			if len(updatedBook.Author) != 0 {
-				Library[index].Author = updatedBook.Author
-			}
-			c.JSON(http.StatusOK, gin.H{"data": updatedBook})
-			return
-		}
-	}
-
-	c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
+	c.JSON(http.StatusOK, gin.H{"data": updatedBook})
 }
 
-func removeIt(book models.Book, bookSlice []models.Book) []models.Book {
-	for index, bookToDelete := range bookSlice {
-		if bookToDelete.Id == book.Id {
-			return append(bookSlice[0:index], bookSlice[index+1:]...)
-		}
-	}
-	return bookSlice
-}
+func (repository *BookRepo) DeleteBooks(c *gin.Context) {
 
-func DeleteBooks(c *gin.Context) {
-	bookFound := false
+	//id := c.Param("id")
 
-	var bookFind models.Book
-	for _, book := range Library {
-		if c.Param("id") == strconv.Itoa(book.Id) {
-			bookFound = true
-			bookFind = book
-		}
-	}
-
-	if !bookFound {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Record not found!"})
-		return
-	}
-
-	Library = removeIt(bookFind, Library)
-	c.JSON(http.StatusOK, gin.H{"data": true})
+	c.JSON(http.StatusOK, gin.H{"message": "Book deleted!"})
 }
