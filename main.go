@@ -14,7 +14,7 @@ import (
 func main() {
 	db := database.ConnectDb()
 	db.AutoMigrate(&models.Book{})
-	//database.InitDatabase(db)
+	database.InitDatabase(db)
 
 	bookRepo := controllers.BookRepo{
 		Db: db,

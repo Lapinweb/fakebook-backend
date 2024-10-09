@@ -6,7 +6,7 @@ import (
 
 type Book struct {
 	gorm.Model
-	Id     uint   `gorm:"primaryKey;autoIncrement" json:"key"`
+	ID     uint   `json:"key"`
 	Title  string `json:"title"`
 	Author string `json:"author_name"`
 	Image  string `json:"cover_i"`
@@ -27,6 +27,5 @@ func (book *Book) UpdateOrCreateBook(db *gorm.DB) error {
 }
 
 func (book *Book) DeleteBook(db *gorm.DB, id uint) error {
-	err := db.Delete(book, id).Error
-	return err
+	return db.Delete(book, id).Error
 }
